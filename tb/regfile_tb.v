@@ -51,6 +51,30 @@ module regfile_tb;
         write_reg(5'd31, 32'h0000000F);                 // highest register
         expect_reads(5'd31, 5'd1, 32'h0000000F, 32'hDEADBEEF);
 
+        write_reg(5'd5, 32'h55555555); // writing one register leaves others alone
+        expect_reads(5'd1, 5'd2,  32'hDEADBEEF, 32'h12345678);
+        expect_reads(5'd5, 5'd31, 32'h55555555, 32'h0000000F);
+
+        
+        write_reg(5'd1, 32'h0BADF00D);  // overwrite an existing value
+        expect_reads(5'd1, 5'd2, 32'h0BADF00D, 32'h12345678);
+
+        // both ports reading the same register
+        expect_reads(5'd2, 5'd2, 32'h12345678, 32'h12345678);
+
+        // read and write the same register in the same cycle
+        write_reg(5'd7, 32'h11111111);
+        rs1_addr = 5'd7; rd_addr = 5'd7; rd_data = 32'hAAAA5555; we = 1; #1;
+        if (rs1_data !== 32'h11111111) begin
+            $display("FAIL same-cycle: before edge should read OLD value, got %h", rs1_data);
+            errors = errors + 1;
+        end
+        @(posedge clk); #1; we = 0;
+        if (rs1_data !== 32'hAAAA5555) begin
+            $display("FAIL same-cycle: after edge should read NEW value, got %h", rs1_data);
+            errors = errors + 1;
+        end
+
         if (errors == 0) $display("ALL TESTS PASSED");
         else             $display("%0d TESTS FAILED", errors);
         $finish;
