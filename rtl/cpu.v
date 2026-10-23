@@ -1,6 +1,7 @@
 module cpu (
-    input wire clk,
-    input wire rst
+    input wire        clk,
+    input wire        rst,
+    input wire [31:0] mem_latency   // extra cycles every load/store waits
 );
     reg  [31:0] pc = 32'd0;
     wire [31:0] instr;
@@ -14,6 +15,16 @@ module cpu (
     wire [31:0] rs1_data, rs2_data, alu_b, alu_result, mem_rdata, rd_data;
     wire        zero;
 
+    // ---- memory latency: a load/store waits mem_latency extra cycles ----
+    reg  [31:0] wait_cnt = 32'd0;
+    wire        mem_op   = mem_read || mem_write;
+    wire        stall    = mem_op && (wait_cnt < mem_latency);
+
+    // ---- performance counters ----
+    reg  [31:0] cycle_count = 32'd0;
+    reg  [31:0] instret     = 32'd0;
+    reg  [31:0] mem_ops     = 32'd0;
+
     imem u_imem (.addr(pc), .instr(instr));
 
     decoder u_decoder (
@@ -24,7 +35,7 @@ module cpu (
     );
 
     regfile u_regfile (
-        .clk(clk), .we(reg_write && !rst),
+        .clk(clk), .we(reg_write && !rst && !stall),
         .rs1_addr(rs1), .rs2_addr(rs2), .rd_addr(rd), .rd_data(rd_data),
         .rs1_data(rs1_data), .rs2_data(rs2_data)
     );
@@ -37,7 +48,7 @@ module cpu (
     );
 
     dmem u_dmem (
-        .clk(clk), .we(mem_write && !rst),
+        .clk(clk), .we(mem_write && !rst && !stall),
         .addr(alu_result), .wdata(rs2_data), .rdata(mem_rdata)
     );
 
@@ -50,7 +61,22 @@ module cpu (
     wire [31:0] pc_next = take_branch ? (pc + imm) : (pc + 32'd4);
 
     always @(posedge clk) begin
-        if (rst) pc <= 32'd0;
-        else     pc <= pc_next;
+        if (rst) begin
+            pc          <= 32'd0;
+            wait_cnt    <= 32'd0;
+            cycle_count <= 32'd0;
+            instret     <= 32'd0;
+            mem_ops     <= 32'd0;
+        end else begin
+            cycle_count <= cycle_count + 1;
+            if (stall) begin
+                wait_cnt <= wait_cnt + 1;       // still waiting: change nothing else
+            end else begin
+                wait_cnt <= 32'd0;
+                pc       <= pc_next;            // the instruction completes
+                instret  <= instret + 1;
+                if (mem_op) mem_ops <= mem_ops + 1;
+            end
+        end
     end
 endmodule
