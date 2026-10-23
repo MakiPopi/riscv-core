@@ -1,7 +1,6 @@
 SIM = sim
-RTL = rtl/alu.v rtl/regfile.v rtl/decoder.v rtl/imem.v rtl/dmem.v rtl/cpu.v
 
-all: alu regfile decoder cpu
+all: alu regfile decoder tests
 
 alu:
 	iverilog -o $(SIM)/alu_tb rtl/alu.v tb/alu_tb.v
@@ -15,11 +14,10 @@ decoder:
 	iverilog -o $(SIM)/decoder_tb rtl/decoder.v tb/decoder_tb.v
 	vvp $(SIM)/decoder_tb
 
-cpu:
-	iverilog -o $(SIM)/cpu_tb $(RTL) tb/cpu_tb.v
-	vvp $(SIM)/cpu_tb
+tests:
+	./run_tests.sh
 
 clean:
 	rm -f $(SIM)/*
 
-.PHONY: all alu regfile decoder cpu clean
+.PHONY: all alu regfile decoder tests clean
