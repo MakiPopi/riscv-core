@@ -6,11 +6,14 @@ module dmem (
     output wire [31:0] rdata
 );
     reg [31:0] mem [0:255];
+    reg [8*128-1:0] dfile;
     integer i;
 
     initial begin
         for (i = 0; i < 256; i = i + 1)
             mem[i] = 32'd0;
+        if ($value$plusargs("data=%s", dfile))   // preload data memory
+            $readmemh(dfile, mem);
     end
 
     always @(posedge clk) begin

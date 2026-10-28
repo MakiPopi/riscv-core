@@ -5,6 +5,7 @@ module cpu_tb;
     reg  [31:0] latency;
     reg         halted;
     real        cpi;
+    integer     i, bad;
 
     cpu dut (.clk(clk), .rst(rst), .mem_latency(latency));
 
@@ -22,22 +23,32 @@ module cpu_tb;
 
         halted = 0;
         while (!halted && dut.cycle_count < 100000) begin
-            @(negedge clk);   // mid-cycle, when all signals have settled
+            @(negedge clk);
             if (!dut.stall && dut.pc_next === dut.pc)
-                halted = 1;   // this instruction jumps to itself: halt loop
+                halted = 1;
         end
 
         if (!halted)
             $display("RESULT: TIMEOUT (program never halted)");
+        else if (dut.u_dmem.mem[0] === 32'd0)
+            $display("RESULT: FAIL (program wrote no result)");
+        else if (dut.u_dmem.mem[0] !== 32'd1000)
+            $display("RESULT: FAIL (check #%0d)", dut.u_dmem.mem[0]);
         else begin
-            cpi = (1.0 * dut.cycle_count) / dut.instret;
-            if (dut.u_dmem.mem[0] === 32'd1000)
+            bad = 0;
+            if ($test$plusargs("verify_copy")) begin
+                if (dut.u_dmem.mem[64] === 32'd0) bad = bad + 1;   // source never loaded
+                for (i = 0; i < 32; i = i + 1)
+                    if (dut.u_dmem.mem[128 + i] !== dut.u_dmem.mem[64 + i])
+                        bad = bad + 1;
+            end
+            if (bad != 0)
+                $display("RESULT: FAIL (copy verification: %0d problems)", bad);
+            else begin
+                cpi = (1.0 * dut.cycle_count) / dut.instret;
                 $display("RESULT: PASS cycles=%0d instret=%0d mem_ops=%0d CPI=%0.2f",
                          dut.cycle_count, dut.instret, dut.mem_ops, cpi);
-            else if (dut.u_dmem.mem[0] === 32'd0)
-                $display("RESULT: FAIL (program wrote no result)");
-            else
-                $display("RESULT: FAIL (check #%0d)", dut.u_dmem.mem[0]);
+            end
         end
         $finish;
     end

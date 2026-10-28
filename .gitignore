@@ -1,2 +1,3 @@
 sim/
 sw/test_*.hex
+sw/bench_*.hex
