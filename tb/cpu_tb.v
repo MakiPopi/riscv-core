@@ -42,8 +42,16 @@ module cpu_tb;
                     if (dut.u_dmem.mem[128 + i] !== dut.u_dmem.mem[64 + i])
                         bad = bad + 1;
             end
+            if ($test$plusargs("verify_and")) begin
+                if (dut.u_dmem.mem[64] === 32'd0 || dut.u_dmem.mem[96] === 32'd0)
+                    bad = bad + 1;                                  // inputs never loaded
+                for (i = 0; i < 32; i = i + 1)
+                    if (dut.u_dmem.mem[128 + i] !==
+                        (dut.u_dmem.mem[64 + i] & dut.u_dmem.mem[96 + i]))
+                        bad = bad + 1;
+            end
             if (bad != 0)
-                $display("RESULT: FAIL (copy verification: %0d problems)", bad);
+                $display("RESULT: FAIL (verification: %0d problems)", bad);
             else begin
                 cpi = (1.0 * dut.cycle_count) / dut.instret;
                 $display("RESULT: PASS cycles=%0d instret=%0d mem_ops=%0d CPI=%0.2f",
