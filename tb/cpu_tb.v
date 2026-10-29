@@ -3,11 +3,12 @@ module cpu_tb;
     reg         clk = 0;
     reg         rst = 1;
     reg  [31:0] latency;
+    reg         cache_en;
     reg         halted;
     real        cpi;
     integer     i, bad;
 
-    cpu dut (.clk(clk), .rst(rst), .mem_latency(latency));
+    cpu dut (.clk(clk), .rst(rst), .mem_latency(latency), .cache_en(cache_en));
 
     always #5 clk = ~clk;
 
@@ -15,8 +16,8 @@ module cpu_tb;
         $dumpfile("sim/cpu.vcd");
         $dumpvars(0, cpu_tb);
 
-        if (!$value$plusargs("latency=%d", latency))
-            latency = 0;
+        if (!$value$plusargs("latency=%d", latency)) latency  = 0;
+        if (!$value$plusargs("cache=%d",   cache_en)) cache_en = 0;
 
         repeat (2) @(posedge clk);
         #1 rst = 0;
@@ -36,6 +37,12 @@ module cpu_tb;
             $display("RESULT: FAIL (check #%0d)", dut.u_dmem.mem[0]);
         else begin
             bad = 0;
+            // every cycle is either a stall or a completed instruction
+            if (dut.cycle_count !== dut.instret + dut.stall_cycles) begin
+                $display("counter mismatch: cycles=%0d instret=%0d stalls=%0d",
+                         dut.cycle_count, dut.instret, dut.stall_cycles);
+                bad = bad + 1;
+            end
             if ($test$plusargs("verify_copy")) begin
                 if (dut.u_dmem.mem[64] === 32'd0) bad = bad + 1;   // source never loaded
                 for (i = 0; i < 32; i = i + 1)
@@ -54,8 +61,9 @@ module cpu_tb;
                 $display("RESULT: FAIL (verification: %0d problems)", bad);
             else begin
                 cpi = (1.0 * dut.cycle_count) / dut.instret;
-                $display("RESULT: PASS cycles=%0d instret=%0d mem_ops=%0d CPI=%0.2f",
-                         dut.cycle_count, dut.instret, dut.mem_ops, cpi);
+                $display("RESULT: PASS cycles=%0d instret=%0d mem_ops=%0d stalls=%0d hits=%0d misses=%0d CPI=%0.2f",
+                         dut.cycle_count, dut.instret, dut.mem_ops, dut.stall_cycles,
+                         dut.cache_hits, dut.cache_misses, cpi);
             end
         end
         $finish;
