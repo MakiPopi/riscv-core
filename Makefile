@@ -1,6 +1,6 @@
 SIM = sim
 
-all: alu regfile decoder cache tests
+all: alu regfile decoder cache dmem tests
 
 alu:
 	iverilog -o $(SIM)/alu_tb rtl/alu.v tb/alu_tb.v
@@ -18,10 +18,14 @@ cache:
 	iverilog -o $(SIM)/cache_tb rtl/cache.v rtl/dmem.v tb/cache_tb.v
 	vvp $(SIM)/cache_tb
 
+dmem:
+	iverilog -o $(SIM)/dmem_tb rtl/dmem.v tb/dmem_row_tb.v
+	vvp $(SIM)/dmem_tb
+
 tests:
 	./run_tests.sh
 
 clean:
 	rm -f $(SIM)/*
 
-.PHONY: all alu regfile decoder cache tests clean
+.PHONY: all alu regfile decoder cache dmem tests clean
