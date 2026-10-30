@@ -2,7 +2,8 @@ module cpu (
     input wire        clk,
     input wire        rst,
     input wire [31:0] mem_latency,   // extra cycles a memory access waits
-    input wire        cache_en       // 1 = use the data cache, 0 = go straight to memory
+    input wire        cache_en,      // 1 = use the data cache, 0 = go straight to memory
+    input wire        ideal_store    // 1 = stores never wait (ideal store buffer)
 );
     reg  [31:0] pc = 32'd0;
     wire [31:0] instr;
@@ -25,7 +26,7 @@ module cpu (
     wire mem_op    = mem_read || mem_write;
     wire cache_hit = cache_en && cache_hit_raw;
     wire load_hit  = mem_read && cache_hit;       // served by the cache: no waiting
-    wire waits     = mem_op && !load_hit;         // everything else pays the latency
+    wire waits     = mem_op && !load_hit && !(mem_write && ideal_store);   // stores are free if ideal
 
     reg  [31:0] wait_cnt = 32'd0;
     wire        stall    = waits && (wait_cnt < mem_latency);

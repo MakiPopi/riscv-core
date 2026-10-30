@@ -4,11 +4,12 @@ module cpu_tb;
     reg         rst = 1;
     reg  [31:0] latency;
     reg         cache_en;
+    reg         ideal_store;
     reg         halted;
     real        cpi;
     integer     i, bad;
 
-    cpu dut (.clk(clk), .rst(rst), .mem_latency(latency), .cache_en(cache_en));
+    cpu dut (.clk(clk), .rst(rst), .mem_latency(latency), .cache_en(cache_en), .ideal_store(ideal_store));
 
     always #5 clk = ~clk;
 
@@ -18,6 +19,7 @@ module cpu_tb;
 
         if (!$value$plusargs("latency=%d", latency)) latency  = 0;
         if (!$value$plusargs("cache=%d",   cache_en)) cache_en = 0;
+        if (!$value$plusargs("ideal_store=%d", ideal_store)) ideal_store = 0;
 
         repeat (2) @(posedge clk);
         #1 rst = 0;
