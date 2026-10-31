@@ -12,13 +12,16 @@ module decoder (
     output reg         mem_write,
     output reg         mem_to_reg,  // 1 = write memory data to rd
     output reg         branch,
-    output reg         illegal
+    output reg         illegal,
+    output reg         pim_op,      // 1 = memory-side row operation
+    output reg         pim_and      // with pim_op: 0 = copy, 1 = AND
 );
-    localparam OP_R      = 7'b0110011,
-               OP_I      = 7'b0010011,
-               OP_LOAD   = 7'b0000011,
-               OP_STORE  = 7'b0100011,
-               OP_BRANCH = 7'b1100011;
+    localparam OP_R       = 7'b0110011,
+               OP_I       = 7'b0010011,
+               OP_LOAD    = 7'b0000011,
+               OP_STORE   = 7'b0100011,
+               OP_BRANCH  = 7'b1100011,
+               OP_CUSTOM0 = 7'b0001011;   // reserved by RISC-V for custom extensions
 
     // Must match the codes in alu.v
     localparam ALU_ADD  = 4'd0, ALU_SUB  = 4'd1, ALU_AND = 4'd2, ALU_OR  = 4'd3,
@@ -44,6 +47,8 @@ module decoder (
         mem_to_reg = 1'b0;
         branch     = 1'b0;
         illegal    = 1'b0;
+        pim_op     = 1'b0;
+        pim_and    = 1'b0;
 
         case (opcode)
             OP_R: begin
@@ -95,6 +100,14 @@ module decoder (
                 alu_op = ALU_SUB;   // beq/bne: subtract and check the zero flag
                 imm    = {{19{instr[31]}}, instr[31], instr[7],
                           instr[30:25], instr[11:8], 1'b0};
+            end
+
+            OP_CUSTOM0: begin
+                case (funct3)
+                    3'b000: begin pim_op = 1'b1; pim_and = 1'b0; end   // pim_copy
+                    3'b001: begin pim_op = 1'b1; pim_and = 1'b1; end   // pim_and
+                    default: illegal = 1'b1;
+                endcase
             end
 
             default: illegal = 1'b1;
