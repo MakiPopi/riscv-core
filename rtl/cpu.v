@@ -3,7 +3,8 @@ module cpu (
     input wire        rst,
     input wire [31:0] mem_latency,   // extra cycles a memory access waits
     input wire        cache_en,      // 1 = use the data cache, 0 = go straight to memory
-    input wire        ideal_store    // 1 = stores never wait (ideal store buffer)
+    input wire        ideal_store,   // 1 = stores never wait (ideal store buffer)
+    input wire [31:0] unit_cycles    // extra cycles a row operation (pim_copy/pim_and) takes
 );
     reg  [31:0] pc = 32'd0;
     wire [31:0] instr;
@@ -13,6 +14,7 @@ module cpu (
     wire [31:0] imm;
     wire [3:0]  alu_op;
     wire        reg_write, alu_src, mem_read, mem_write, mem_to_reg, branch, illegal;
+    wire        pim_op, pim_and;
 
     wire [31:0] rs1_data, rs2_data, alu_b, alu_result, mem_rdata, load_data, rd_data;
     wire        zero;
@@ -22,23 +24,27 @@ module cpu (
     wire [31:0]  cache_rdata;
     wire [127:0] line_data;
 
-    // ---- when does a memory access wait? ----
+    // ---- when does the current instruction wait, and for how long? ----
     wire mem_op    = mem_read || mem_write;
     wire cache_hit = cache_en && cache_hit_raw;
     wire load_hit  = mem_read && cache_hit;       // served by the cache: no waiting
-    wire waits     = mem_op && !load_hit && !(mem_write && ideal_store);   // stores are free if ideal
+    wire waits     = pim_op ||                    // a row operation always waits
+                     (mem_op && !load_hit && !(mem_write && ideal_store));
+    wire [31:0] wait_target = pim_op ? unit_cycles : mem_latency;
 
     reg  [31:0] wait_cnt = 32'd0;
-    wire        stall    = waits && (wait_cnt < mem_latency);
+    wire        stall    = waits && (wait_cnt < wait_target);
 
-    // The cache is only changed on the cycle the access completes.
+    // These happen only on the cycle the instruction completes.
     wire cache_fill = cache_en && mem_read  && !cache_hit_raw && !stall && !rst;
     wire cache_upd  = cache_en && mem_write && !stall && !rst;
+    wire row_en     = pim_op && !stall && !rst;
 
     // ---- performance counters ----
     reg  [31:0] cycle_count  = 32'd0;
     reg  [31:0] instret      = 32'd0;
     reg  [31:0] mem_ops      = 32'd0;
+    reg  [31:0] pim_ops      = 32'd0;
     reg  [31:0] stall_cycles = 32'd0;
     reg  [31:0] cache_hits   = 32'd0;   // loads served by the cache
     reg  [31:0] cache_misses = 32'd0;   // loads that had to go to memory (cache on)
@@ -49,7 +55,7 @@ module cpu (
         .instr(instr), .rs1(rs1), .rs2(rs2), .rd(rd), .funct3(funct3),
         .imm(imm), .alu_op(alu_op), .reg_write(reg_write), .alu_src(alu_src),
         .mem_read(mem_read), .mem_write(mem_write), .mem_to_reg(mem_to_reg),
-        .branch(branch), .illegal(illegal)
+        .branch(branch), .illegal(illegal), .pim_op(pim_op), .pim_and(pim_and)
     );
 
     regfile u_regfile (
@@ -68,7 +74,9 @@ module cpu (
     dmem u_dmem (
         .clk(clk), .we(mem_write && !rst && !stall),
         .addr(alu_result), .wdata(rs2_data), .rdata(mem_rdata),
-        .line_addr(alu_result), .line_rdata(line_data)
+        .line_addr(alu_result), .line_rdata(line_data),
+        .row_en(row_en), .row_and(pim_and),
+        .row_dst(rs1_data), .row_src(rs2_data)
     );
 
     cache u_cache (
@@ -94,6 +102,7 @@ module cpu (
             cycle_count  <= 32'd0;
             instret      <= 32'd0;
             mem_ops      <= 32'd0;
+            pim_ops      <= 32'd0;
             stall_cycles <= 32'd0;
             cache_hits   <= 32'd0;
             cache_misses <= 32'd0;
@@ -107,6 +116,7 @@ module cpu (
                 pc       <= pc_next;                // the instruction completes
                 instret  <= instret + 1;
                 if (mem_op) mem_ops <= mem_ops + 1;
+                if (pim_op) pim_ops <= pim_ops + 1;
                 if (mem_read && cache_en) begin
                     if (cache_hit) cache_hits   <= cache_hits + 1;
                     else           cache_misses <= cache_misses + 1;

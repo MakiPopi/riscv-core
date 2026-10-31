@@ -3,13 +3,15 @@ module cpu_tb;
     reg         clk = 0;
     reg         rst = 1;
     reg  [31:0] latency;
+    reg  [31:0] unit_cycles;
     reg         cache_en;
     reg         ideal_store;
     reg         halted;
     real        cpi;
     integer     i, bad;
 
-    cpu dut (.clk(clk), .rst(rst), .mem_latency(latency), .cache_en(cache_en), .ideal_store(ideal_store));
+    cpu dut (.clk(clk), .rst(rst), .mem_latency(latency), .cache_en(cache_en),
+             .ideal_store(ideal_store), .unit_cycles(unit_cycles));
 
     always #5 clk = ~clk;
 
@@ -17,9 +19,11 @@ module cpu_tb;
         $dumpfile("sim/cpu.vcd");
         $dumpvars(0, cpu_tb);
 
-        if (!$value$plusargs("latency=%d", latency)) latency  = 0;
-        if (!$value$plusargs("cache=%d",   cache_en)) cache_en = 0;
+        if (!$value$plusargs("latency=%d", latency))         latency     = 0;
+        if (!$value$plusargs("cache=%d",   cache_en))        cache_en    = 0;
         if (!$value$plusargs("ideal_store=%d", ideal_store)) ideal_store = 0;
+        // default unit cost: read a row, stream 32 words, write a row
+        if (!$value$plusargs("unit_cycles=%d", unit_cycles)) unit_cycles = 2 * latency + 32;
 
         repeat (2) @(posedge clk);
         #1 rst = 0;
@@ -63,8 +67,8 @@ module cpu_tb;
                 $display("RESULT: FAIL (verification: %0d problems)", bad);
             else begin
                 cpi = (1.0 * dut.cycle_count) / dut.instret;
-                $display("RESULT: PASS cycles=%0d instret=%0d mem_ops=%0d stalls=%0d hits=%0d misses=%0d CPI=%0.2f",
-                         dut.cycle_count, dut.instret, dut.mem_ops, dut.stall_cycles,
+                $display("RESULT: PASS cycles=%0d instret=%0d mem_ops=%0d pim_ops=%0d stalls=%0d hits=%0d misses=%0d CPI=%0.2f",
+                         dut.cycle_count, dut.instret, dut.mem_ops, dut.pim_ops, dut.stall_cycles,
                          dut.cache_hits, dut.cache_misses, cpi);
             end
         end
