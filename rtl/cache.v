@@ -7,16 +7,23 @@ module cache (
     input  wire         upd_en,      // store: update the cached word (only if it is there)
     input  wire [31:0]  wdata,       // data for that update
     input  wire         fill_en,     // install the whole line that contains addr
-    input  wire [127:0] fill_data    // the line, word 0 in bits [31:0]
+    input  wire [127:0] fill_data,   // the line, word 0 in bits [31:0]
+    input  wire         inv_en,      // drop every cached line that belongs to one memory row
+    input  wire [31:0]  inv_addr     // any address inside that row
 );
     wire [1:0] word = addr[3:2];
     wire [3:0] idx  = addr[7:4];
     wire [1:0] tag  = addr[9:8];
 
+    // A memory row is 128 bytes (address bits 9:7). It covers 8 cache lines:
+    // those whose line number has the same bit 3 as the row's lowest bit.
+    wire [2:0] inv_row = inv_addr[9:7];
+
     reg [31:0] data  [0:63];    // 16 lines x 4 words
     reg [1:0]  tags  [0:15];    // one tag per line
     reg [15:0] valid;           // one valid bit per line
     integer i;
+    integer k;
 
     initial begin
         valid = 16'd0;
@@ -25,10 +32,10 @@ module cache (
     end
 
     // Lookup (combinational): no clock needed to read.
-    assign hit   = valid[idx]&& (tags[idx] == tag) ;
+    assign hit   = valid[idx] && (tags[idx] == tag);
     assign rdata = data[{idx, word}];
 
-    // Updates happen on the clock edge.
+    // Updates happen on the clock edge. Only one of these happens per cycle.
     always @(posedge clk) begin
         if (rst) begin
             valid <= 16'd0;                       // reset empties the cache
@@ -41,6 +48,11 @@ module cache (
             valid[idx] <= 1'b1;
         end else if (upd_en && hit) begin
             data[{idx, word}] <= wdata;           // write hit: change one word
+        end else if (inv_en) begin
+            // the memory row changed behind our back: forget its lines
+            for (k = 0; k < 8; k = k + 1)
+                if (tags[{inv_row[0], k[2:0]}] == inv_row[2:1])
+                    valid[{inv_row[0], k[2:0]}] <= 1'b0;
         end
     end
 endmodule

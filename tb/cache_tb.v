@@ -6,6 +6,8 @@ module cache_tb;
     reg          upd_en = 0;
     reg  [31:0]  wdata = 0;
     reg          fill_en = 0;
+    reg          inv_en = 0;
+    reg  [31:0]  inv_addr = 0;
     wire         hit;
     wire [31:0]  rdata;
     wire [127:0] line;
@@ -13,11 +15,13 @@ module cache_tb;
     integer      w;
 
     cache u_cache (.clk(clk), .rst(rst), .addr(addr), .hit(hit), .rdata(rdata),
-                   .upd_en(upd_en), .wdata(wdata), .fill_en(fill_en), .fill_data(line));
+                   .upd_en(upd_en), .wdata(wdata), .fill_en(fill_en), .fill_data(line),
+                   .inv_en(inv_en), .inv_addr(inv_addr));
 
     // The data memory supplies the line to install, as it will in the real CPU.
     dmem u_dmem (.clk(clk), .we(1'b0), .addr(32'd0), .wdata(32'd0), .rdata(),
-                 .line_addr(addr), .line_rdata(line));
+                 .line_addr(addr), .line_rdata(line),
+                 .row_en(1'b0), .row_and(1'b0), .row_dst(32'd0), .row_src(32'd0));
 
     always #5 clk = ~clk;
 
@@ -59,6 +63,14 @@ module cache_tb;
         end
     endtask
 
+    task invalidate(input [31:0] a);
+        begin
+            inv_addr = a; inv_en = 1;
+            @(posedge clk); #1;
+            inv_en = 0;
+        end
+    endtask
+
     initial begin
         #2;   // let dmem finish its own initialisation first
         for (w = 0; w < 256; w = w + 1)
@@ -67,10 +79,10 @@ module cache_tb;
         repeat (2) @(posedge clk);
         #1 rst = 0;
 
-        // 1. an empty cache misses
+        // 1. an empty cache misses (including addresses whose tag equals the initial tag 0)
         expect_hit(32'h100, 0);
         expect_hit(32'h110, 0);
-        expect_hit(32'h000, 0);   
+        expect_hit(32'h000, 0);
         expect_hit(32'h0F0, 0);
 
         // 2. a fill brings in the whole line (words 64..67 = bytes 0x100..0x10C)
@@ -102,6 +114,21 @@ module cache_tb;
         // 7. reset empties the cache
         rst = 1; @(posedge clk); #1 rst = 0;
         expect_hit(32'h200, 0);
+
+        // 8. invalidating a memory row (row 4 = 0x200..0x27F) drops only that row's lines
+        fill(32'h200);                          // row 4, line 0, tag 2
+        fill(32'h270);                          // row 4, line 7, tag 2
+        fill(32'h280);                          // row 5, line 8, tag 2
+        fill(32'h110);                          // row 2, line 1, tag 1: same line number range as row 4
+        expect_hit(32'h200, 1);
+        expect_hit(32'h270, 1);
+        expect_hit(32'h280, 1);
+        expect_hit(32'h110, 1);
+        invalidate(32'h240);                    // any address inside row 4
+        expect_hit(32'h200, 0);
+        expect_hit(32'h270, 0);
+        expect_hit(32'h280, 1);                 // row 5 survives
+        expect_hit(32'h110, 1);                 // row 2 survives: same line number, different tag
 
         if (errors == 0) $display("ALL TESTS PASSED");
         else             $display("%0d TESTS FAILED", errors);

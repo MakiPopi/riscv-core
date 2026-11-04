@@ -83,7 +83,8 @@ module cpu (
         .clk(clk), .rst(rst), .addr(alu_result),
         .hit(cache_hit_raw), .rdata(cache_rdata),
         .upd_en(cache_upd), .wdata(rs2_data),
-        .fill_en(cache_fill), .fill_data(line_data)
+        .fill_en(cache_fill), .fill_data(line_data),
+        .inv_en(row_en), .inv_addr(rs1_data)
     );
 
     assign load_data = load_hit ? cache_rdata : mem_rdata;
