@@ -10,7 +10,5 @@ loop:
     addi x2, x2, 4
     addi x3, x3, -1
     bne  x3, x0, loop
-    addi x30, x0, 1000
-    sw   x30, 0(x0)         # report "finished"
 halt:
     beq  x0, x0, halt

@@ -67,7 +67,5 @@ _start:
     sw   x4, 120(x2)
     lw   x4, 124(x1)
     sw   x4, 124(x2)
-    addi x30, x0, 1000
-    sw   x30, 0(x0)
 halt:
     beq  x0, x0, halt

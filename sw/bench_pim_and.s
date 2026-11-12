@@ -6,7 +6,5 @@ _start:
     addi x12, x0, 512        # array C, row 4
     pim_copy x12, x10        # C = A
     pim_and  x12, x11        # C = C AND B, which is A AND B
-    addi x30, x0, 1000
-    sw   x30, 0(x0)          # report "finished"
 halt:
     beq  x0, x0, halt

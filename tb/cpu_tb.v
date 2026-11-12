@@ -4,14 +4,16 @@ module cpu_tb;
     reg         rst = 1;
     reg  [31:0] latency;
     reg  [31:0] unit_cycles;
+    reg  [31:0] fill_extra;
     reg         cache_en;
     reg         ideal_store;
     reg         halted;
+    reg         is_bench;
     real        cpi;
     integer     i, bad;
 
     cpu dut (.clk(clk), .rst(rst), .mem_latency(latency), .cache_en(cache_en),
-             .ideal_store(ideal_store), .unit_cycles(unit_cycles));
+             .ideal_store(ideal_store), .unit_cycles(unit_cycles), .fill_extra(fill_extra));
 
     always #5 clk = ~clk;
 
@@ -24,6 +26,11 @@ module cpu_tb;
         if (!$value$plusargs("ideal_store=%d", ideal_store)) ideal_store = 0;
         // default unit cost: read a row, stream 32 words, write a row
         if (!$value$plusargs("unit_cycles=%d", unit_cycles)) unit_cycles = 2 * latency + 32;
+        // default line fill: the first word with the latency, then one word per cycle
+        if (!$value$plusargs("fill_extra=%d", fill_extra))   fill_extra  = 3;
+
+        // benchmarks are checked by their verification, tests by the result word
+        is_bench = $test$plusargs("verify_copy") || $test$plusargs("verify_and");
 
         repeat (2) @(posedge clk);
         #1 rst = 0;
@@ -37,9 +44,9 @@ module cpu_tb;
 
         if (!halted)
             $display("RESULT: TIMEOUT (program never halted)");
-        else if (dut.u_dmem.mem[0] === 32'd0)
+        else if (!is_bench && dut.u_dmem.mem[0] === 32'd0)
             $display("RESULT: FAIL (program wrote no result)");
-        else if (dut.u_dmem.mem[0] !== 32'd1000)
+        else if (!is_bench && dut.u_dmem.mem[0] !== 32'd1000)
             $display("RESULT: FAIL (check #%0d)", dut.u_dmem.mem[0]);
         else begin
             bad = 0;

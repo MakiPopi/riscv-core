@@ -132,7 +132,5 @@ _start:
     lw   x7, 124(x2)
     and  x8, x6, x7
     sw   x8, 124(x3)
-    addi x30, x0, 1000
-    sw   x30, 0(x0)
 halt:
     beq  x0, x0, halt

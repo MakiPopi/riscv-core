@@ -4,7 +4,8 @@ module cpu (
     input wire [31:0] mem_latency,   // extra cycles a memory access waits
     input wire        cache_en,      // 1 = use the data cache, 0 = go straight to memory
     input wire        ideal_store,   // 1 = stores never wait (ideal store buffer)
-    input wire [31:0] unit_cycles    // extra cycles a row operation (pim_copy/pim_and) takes
+    input wire [31:0] unit_cycles,    // extra cycles a row operation (pim_copy/pim_and) takes
+    input wire [31:0] fill_extra     // extra cycles a cache line fill takes beyond mem_latency
 );
     reg  [31:0] pc = 32'd0;
     wire [31:0] instr;
@@ -30,7 +31,9 @@ module cpu (
     wire load_hit  = mem_read && cache_hit;       // served by the cache: no waiting
     wire waits     = pim_op ||                    // a row operation always waits
                      (mem_op && !load_hit && !(mem_write && ideal_store));
-    wire [31:0] wait_target = pim_op ? unit_cycles : mem_latency;
+    wire [31:0] wait_target = pim_op ? unit_cycles :
+                              (mem_read && cache_en) ? (mem_latency + fill_extra) :
+                              mem_latency;
 
     reg  [31:0] wait_cnt = 32'd0;
     wire        stall    = waits && (wait_cnt < wait_target);
