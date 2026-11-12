@@ -1,0 +1,21 @@
+scenario                           L   best CPU     unit   speedup
+copy                               0         66       35     1.89x
+copy                              10        170       55     3.09x
+copy                              20        250       75     3.33x
+copy                              50        490      135     3.63x
+copy                             100        890      235     3.79x
+and                                0        131       69     1.90x
+and                               10        339      109     3.11x
+and                               20        499      149     3.35x
+and                               50        979      269     3.64x
+and                              100       1779      469     3.79x
+copy + sum, cold destination       0        131      100     1.31x
+copy + sum, cold destination      10        339      224     1.51x
+copy + sum, cold destination      20        499      324     1.54x
+copy + sum, cold destination      50        979      624     1.57x
+copy + sum, cold destination     100       1779     1124     1.58x
+copy + sum, hot destination        0        196      165     1.19x
+copy + sum, hot destination       10        404      393     1.03x
+copy + sum, hot destination       20        564      573     0.98x
+copy + sum, hot destination       50       1044     1113     0.94x
+copy + sum, hot destination      100       1844     2013     0.92x

@@ -25,7 +25,11 @@ dmem:
 tests:
 	./run_tests.sh
 
+eval:
+	./run_sweep.sh
+	python3 plot_results.py | tee results/summary.txt
+
 clean:
 	rm -f $(SIM)/*
 
-.PHONY: all alu regfile decoder cache dmem tests clean
+.PHONY: all alu regfile decoder cache dmem tests eval clean
