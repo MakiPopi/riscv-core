@@ -9,6 +9,7 @@ module cpu_tb;
     reg         ideal_store;
     reg         halted;
     reg         is_bench;
+    reg  [31:0] sum;
     real        cpi;
     integer     i, bad;
 
@@ -30,7 +31,7 @@ module cpu_tb;
         if (!$value$plusargs("fill_extra=%d", fill_extra))   fill_extra  = 3;
 
         // benchmarks are checked by their verification, tests by the result word
-        is_bench = $test$plusargs("verify_copy") || $test$plusargs("verify_and");
+        is_bench = $test$plusargs("verify_copy") || $test$plusargs("verify_and") || $test$plusargs("verify_sum");
 
         repeat (2) @(posedge clk);
         #1 rst = 0;
@@ -69,6 +70,17 @@ module cpu_tb;
                     if (dut.u_dmem.mem[128 + i] !==
                         (dut.u_dmem.mem[64 + i] & dut.u_dmem.mem[96 + i]))
                         bad = bad + 1;
+            end
+            if ($test$plusargs("verify_sum")) begin
+                // row 3 (words 96..127) must equal row 2 (words 64..95), and the
+                // CPU must have summed the destination row into x5
+                sum = 32'd0;
+                if (dut.u_dmem.mem[64] === 32'd0) bad = bad + 1;   // source never loaded
+                for (i = 0; i < 32; i = i + 1) begin
+                    if (dut.u_dmem.mem[96 + i] !== dut.u_dmem.mem[64 + i]) bad = bad + 1;
+                    sum = sum + dut.u_dmem.mem[64 + i];
+                end
+                if (dut.u_regfile.regs[5] !== sum) bad = bad + 1;
             end
             if (bad != 0)
                 $display("RESULT: FAIL (verification: %0d problems)", bad);

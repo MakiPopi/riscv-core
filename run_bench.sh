@@ -23,3 +23,7 @@ run pim_copy      data_copy32.hex copy
 run and           data_and32.hex  and
 run and_unrolled  data_and32.hex  and
 run pim_and       data_and32.hex  and
+run cons_cpu      data_copy32.hex sum
+run cons_pim      data_copy32.hex sum
+run hot_cpu       data_copy32.hex sum
+run hot_pim       data_copy32.hex sum
