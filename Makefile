@@ -2,23 +2,26 @@ SIM = sim
 
 all: alu regfile decoder cache dmem tests
 
-alu:
+$(SIM):
+	mkdir -p $(SIM)
+
+alu: | $(SIM)
 	iverilog -o $(SIM)/alu_tb rtl/alu.v tb/alu_tb.v
 	vvp $(SIM)/alu_tb
 
-regfile:
+regfile: | $(SIM)
 	iverilog -o $(SIM)/regfile_tb rtl/regfile.v tb/regfile_tb.v
 	vvp $(SIM)/regfile_tb
 
-decoder:
+decoder: | $(SIM)
 	iverilog -o $(SIM)/decoder_tb rtl/decoder.v tb/decoder_tb.v
 	vvp $(SIM)/decoder_tb
 
-cache:
+cache: | $(SIM)
 	iverilog -o $(SIM)/cache_tb rtl/cache.v rtl/dmem.v tb/cache_tb.v
 	vvp $(SIM)/cache_tb
 
-dmem:
+dmem: | $(SIM)
 	iverilog -o $(SIM)/dmem_tb rtl/dmem.v tb/dmem_row_tb.v
 	vvp $(SIM)/dmem_tb
 
@@ -28,6 +31,7 @@ tests:
 eval:
 	./run_sweep.sh
 	python3 plot_results.py | tee results/summary.txt
+	python3 check_formulas.py
 
 clean:
 	rm -f $(SIM)/*
